@@ -3,7 +3,7 @@ Fully web based serial terminal using Serial Web API - Access your serial / USB-
 
 Working example: 
 
-https://pythoniot.github.io/WebSerial/
+https://pythoniot.github.io/WebSerial/index.html
 
 https://bipes.net.br/aroca/web-serial-terminal/
 
