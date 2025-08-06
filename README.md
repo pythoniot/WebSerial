@@ -4,6 +4,7 @@ Fully web based serial terminal using Serial Web API - Access your serial / USB-
 Working example: 
 
 https://pythoniot.github.io/WebSerial/
+
 https://bipes.net.br/aroca/web-serial-terminal/
 
 August/2021: Works on Google Chrome and MS-Edge without the need of any special option. Still not available on Firefox.
