@@ -1,78 +1,520 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-<title>Web Serial Terminal for UK524-CDC2I2C, UK527-WEB2I2C and UK529-USB2WST </title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web Serial Terminal for UK524-CDC2I2C, UK527-WEB2I2C and UK529-USB2WST</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f172a'/%3E%3Cpath d='M8 11h4l3 10h2l3-10h4' stroke='%2322d3ee' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <!--
   term.js
   Copyright (c) 2012-2013, Christopher Jeffrey (MIT License)
   Copyright (c) 2016, Paul Sokolovsky
 -->
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #0b1220;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --cyan: #22d3ee;
+    --cyan-dark: #0891b2;
+    --green: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'Courier New', monospace;
+    /* 内容列宽度随屏幕自适应：1080p 以下 1180，大屏放宽避免两侧留白过多 */
+    --content-max: 1180px;
+  }
+  @media (min-width: 1600px) {
+    :root { --content-max: 1400px; }
+    header { padding: 15px 0; }
+    .brand h1 { font-size: 17.5px; }
+    .brand p { font-size: 12px; }
+    .brand-icon { width: 42px; height: 42px; border-radius: 11px; }
+  }
+  @media (min-width: 2200px) { :root { --content-max: 1660px; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1100px 500px at 85% -10%, rgba(34, 211, 238, 0.07), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(34, 211, 238, 0.05), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
 
+  /* ---------- 统一的内容宽度，保证 header / 工具栏 / 终端左右边缘对齐 ---------- */
+  .wrap {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 0 14px; }
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.85);
+    padding: 12px 0;
+  }
+  /* 单行页头：左侧品牌，右侧芯片矩阵贴住容器右边缘，避免右侧大片留白 */
+  .header-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px 40px;
+    flex-wrap: wrap;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-height: 40px;
+    flex: 0 0 auto;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: linear-gradient(135deg, #0e7490, #164e63);
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .brand h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: 0.2px; }
+  .brand p { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+  /* ---------- 芯片矩阵：两排（Gen-1 静态标签 / Gen-2 控制台链接） ---------- */
+  .chip-matrix {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: center;
+    margin-left: auto;
+  }
+  .matrix-label {
+    grid-row: span 2;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #8fa0b8; font-weight: 700; line-height: 1.55;
+    white-space: nowrap;
+    padding-right: 14px;
+    border-right: 1px solid #263449;
+    text-align: right;
+  }
+  .chip-row {
+    display: flex; align-items: center; justify-content: flex-start; gap: 5px;
+    flex-wrap: wrap; row-gap: 6px;
+    min-width: 0;
+  }
+  .row-tag {
+    font-size: 9.5px; font-family: var(--mono); font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 2.5px 7px; border-radius: 5px;
+    color: #7c8ca6; border: 1px solid #334155;
+    background: rgba(51, 65, 85, 0.35);
+    white-space: nowrap;
+  }
+  .row-tag.live { color: #67e8f9; border-color: rgba(34, 211, 238, 0.3); background: rgba(8, 51, 68, 0.45); }
+  .chip {
+    display: inline-flex; align-items: center;
+    font-size: 11px; font-family: var(--mono);
+    border-radius: 999px; white-space: nowrap;
+    line-height: 1.55;
+    transition: all 0.15s;
+  }
+  .chip.plain {
+    padding: 3px 9px;
+    color: #93a4bb;
+    background: rgba(51, 65, 85, 0.4);
+    border: 1px solid #3d4d63;
+  }
+  .chip.link {
+    padding: 3px 9px;
+    color: #67e8f9; text-decoration: none;
+    background: rgba(8, 51, 68, 0.6);
+    border: 1px solid rgba(34, 211, 238, 0.35);
+  }
+  .chip.link:hover {
+    color: #ecfeff;
+    background: rgba(14, 116, 144, 0.55);
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.25);
+  }
+  .chip.dual {
+    background: rgba(8, 51, 68, 0.5);
+    border: 1px solid rgba(34, 211, 238, 0.3);
+    overflow: hidden;
+  }
+  .chip.dual .name {
+    padding: 3px 7px 3px 9px;
+    color: #a5f3fc;
+  }
+  .chip.dual a {
+    padding: 3px 7px;
+    color: #67e8f9; text-decoration: none;
+    border-left: 1px solid rgba(34, 211, 238, 0.22);
+  }
+  .chip.dual a:hover { color: #ecfeff; background: rgba(14, 116, 144, 0.6); }
+
+  /* 宽度不足时退回上下堆叠（芯片行左对齐），避免右侧矩阵被挤到下一行后悬空 */
+  @media (max-width: 1160px) {
+    .header-inner { flex-direction: column; align-items: stretch; gap: 12px; }
+    .chip-matrix { margin-left: 0; width: 100%; grid-template-columns: max-content minmax(0, 1fr); }
+  }
+
+  /* ---------- 连接状态（工具栏内，紧跟 Clear） ---------- */
+  .status {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 600;
+    padding: 7px 13px; border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .status .dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; }
+  .status.on { color: #a7f3d0; border-color: rgba(52, 211, 153, 0.5); }
+  .status.on .dot { background: var(--green); box-shadow: 0 0 8px rgba(52, 211, 153, 0.8); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: 0.45; } }
+
+  /* ---------- Main ---------- */
+  main { flex: 1; width: 100%; max-width: var(--content-max); margin: 0 auto; padding: 16px 24px 8px; }
+  @media (max-width: 640px) {
+    main { padding: 12px 14px 8px; }
+  }
+
+  .toolbar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .toolbar label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  select {
+    appearance: none;
+    background: var(--panel-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2394a3b8' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    padding: 8px 30px 8px 12px; border-radius: 9px;
+    cursor: pointer; outline: none;
+    transition: border-color 0.15s;
+  }
+  select:hover:not(:disabled) { border-color: var(--cyan-dark); }
+  select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  button {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 600;
+    padding: 8px 18px; border-radius: 9px;
+    border: 1px solid transparent;
+    cursor: pointer; outline: none;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  button svg { width: 15px; height: 15px; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  #SerialConnectButton { background: var(--cyan-dark); color: #fff; }
+  #SerialConnectButton:hover:not(:disabled) { background: #0e7490; box-shadow: 0 0 12px rgba(34, 211, 238, 0.35); }
+  #SerialConnectButton.connected { background: #b45309; }
+  #SerialConnectButton.connected:hover:not(:disabled) { background: #c2610c; box-shadow: 0 0 12px rgba(251, 191, 36, 0.3); }
+  #ClearButton { background: transparent; color: var(--muted); border-color: var(--border); }
+  #ClearButton:hover { color: var(--text); border-color: #475569; background: rgba(51, 65, 85, 0.4); }
+
+  .spacer { flex: 1; }
+  .hint-key {
+    font-size: 13px; font-weight: 700;      /* 与 Clear 按钮同字号 */
+    color: #e2e8f0;                          /* 高亮：由 muted 提亮到正文色 */
+    font-family: var(--mono);
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+  }
+  .hint-key kbd {
+    background: rgba(8, 51, 68, 0.7); border: 1px solid rgba(34, 211, 238, 0.45);
+    border-bottom-width: 2px; border-radius: 5px;
+    padding: 1.5px 7px; font-size: 12px; font-weight: 700;
+    color: #a5f3fc; font-family: var(--mono);
+  }
+
+  /* ---------- Terminal ---------- */
+  .term-wrap {
+    margin-top: 14px;
+    background: #05080f;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.45);
+    height: clamp(300px, calc(100vh - 430px), 820px);
+    overflow: hidden;      /* 关键：终端内容永不越界 */
+    display: flex;
+  }
+  #term { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+
+  /* term.js 会注入 .terminal{float:left;border:5px;font:16px} —— 这里统一覆盖成设计稿样式。
+     注意：列数由 JS 按此处的真实字符宽度实测计算，不要再随意改字号。 */
+  .terminal {
+    float: none !important;
+    border: 0 !important;
+    border-radius: 8px;
+    font-family: var(--mono) !important;
+    font-size: 13px !important;
+    line-height: 1.32 !important;
+    background: transparent !important;
+  }
+
+  /* ---------- Banner ---------- */
+  .banner {
+    margin-top: 14px;
+    display: none;
+    align-items: flex-start; gap: 10px;
+    background: rgba(120, 53, 15, 0.25);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    color: #fcd34d;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-size: 12.5px; line-height: 1.55;
+  }
+  .banner svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ---------- Info cards ---------- */
+  .cards {
+    margin: 14px 0 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 16px;
+    font-size: 12px; line-height: 1.65; color: var(--muted);
+  }
+  .card h3 {
+    margin: 0 0 6px;
+    font-size: 12px; font-weight: 700;
+    color: var(--text);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .card h3 svg { width: 14px; height: 14px; color: var(--cyan); }
+  .card a { color: #67e8f9; text-decoration: none; word-break: break-all; }
+  .card a:hover { text-decoration: underline; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 10px 24px;
+    text-align: center;
+    font-size: 11px; color: #64748b;
+  }
+  footer b { color: #94a3b8; }
+</style>
 </head>
 
-<script src="term.js"></script>
 <body>
 
-<div style="display:inline-block; vertical-align:top;">
+<header>
+  <div class="wrap header-inner">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" style="width:22px;height:22px">
+            <path d="M4 8h3l3 8h4l3-8h3"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Web Serial Terminal</h1>
+          <p>Raw serial console via Web Serial API &mdash; Chrome / Edge</p>
+        </div>
+      </div>
+    </div>
 
-<b>Web Serial Terminal for UK524-CDC2I2C, UK527-WEB2I2C and UK529-USB2WST... </b>
-<br>
+    <nav class="chip-matrix" aria-label="Supported chips">
+      <span class="matrix-label">Supported<br>chips</span>
 
-Serial port speed: 
-<select name="speed" id="SerialSpeed">
-  <option value="500000">500000</option>
-  <option value="1000000">1000000</option>
-  <option value="2000000">2000000</option>
-  <option value="4500000">4500000</option>
-  <option value="115200">115200</option>
-  <option value="230400">230400</option>
-  <option value="460800">460800</option>
-  <option value="1200">1200</option>
-  <option value="9600">9600</option>
-  <option value="19200">19200</option>
-</select>
-<button id="SerialConnectButton" type="button" disabled>Connect</button>
+      <div class="chip-row">
+        <span class="row-tag">Gen-1</span>
+        <span class="chip plain" title="与本页终端共用">UK524-CDC2I2C</span>
+        <span class="chip plain" title="与本页终端共用">UK527-WEB2I2C</span>
+        <span class="chip plain" title="当前页面对应型号">UK529-USB2WST</span>
+      </div>
 
-<div id="term">
-</div>
+      <div class="chip-row">
+        <span class="row-tag live">Gen-2</span>
+        <a class="chip link" href="./uk550.html" target="_blank" rel="noopener" title="打开 UK550-WST2MOD 控制台">UK550-WST2MOD</a>
+        <a class="chip link" href="./uk551.html" target="_blank" rel="noopener" title="打开 UK551-WST21WR 控制台">UK551-WST21WR</a>
 
-</div>
+        <span class="chip dual" title="UK554-WST2SPI · Flash 烧录器 / 通用 SPI">
+          <span class="name">UK554-WST2SPI</span>
+          <a href="./uk554-flash.html" target="_blank" rel="noopener">Flash</a>
+          <a href="./uk554-gen.html" target="_blank" rel="noopener">Gen</a>
+        </span>
 
-<p> Use Ctrl+A+C to copy and Ctrl+A+V to paste.	OpenSource Hardware at: <a href=https://oshwhub.com/openiic>https://oshwhub.com/openiic</a> </p>
-<p> Source code: <a href=https://github.com/rafaelaroca/web-serial-terminal>https://github.com/rafaelaroca/web-serial-terminal</a> </p>
-<p> Source code: <a href=https://github.com/pythoniot/WebSerial>https://github.com/pythoniot/WebSerial</a> </p>
+        <span class="chip dual" title="UK557-WST2I2C · EEPROM 烧写 / 通用 I2C">
+          <span class="name">UK557-WST2I2C</span>
+          <a href="./uk557-eeprom.html" target="_blank" rel="noopener">EEPROM</a>
+          <a href="./uk557-gen.html" target="_blank" rel="noopener">Gen</a>
+        </span>
+      </div>
+    </nav>
+  </div>
+</header>
 
-<p> This page can be used offline. Simply download it as <a href=https://github.com/rafaelaroca/web-serial-terminal/archive/refs/heads/master.zip>ZIP file</a>, unzip and open index.html on your browser (Google Chrome or MS-Edge). Firefox still not supported.</p>
+<main>
 
-</body>
+  <div class="toolbar">
+    <label for="SerialSpeed">Baud&nbsp;rate</label>
+    <select name="speed" id="SerialSpeed">
+      <option value="500000">500000</option>
+      <option value="1000000">1000000</option>
+      <option value="2000000">2000000</option>
+      <option value="4500000">4500000</option>
+      <option value="115200">115200</option>
+      <option value="230400">230400</option>
+      <option value="460800">460800</option>
+      <option value="1200">1200</option>
+      <option value="9600">9600</option>
+      <option value="19200">19200</option>
+    </select>
+    <button id="SerialConnectButton" type="button" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+      <span>Connect</span>
+    </button>
+    <button id="ClearButton" type="button" title="Clear terminal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      Clear
+    </button>
 
+    <div class="spacer"></div>
+
+    <div class="status" id="StatusPill" title="Serial connection state">
+      <span class="dot"></span>
+      <span id="StatusText">Disconnected</span>
+    </div>
+
+    <span class="hint-key"><kbd>Ctrl+A</kbd>+<kbd>C</kbd> copy &nbsp;&middot;&nbsp; <kbd>Ctrl+A</kbd>+<kbd>V</kbd> paste</span>
+  </div>
+
+  <div class="term-wrap">
+    <div id="term"></div>
+  </div>
+
+  <div class="banner" id="NoSerialBanner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span>Web Serial API is not available in this browser. Use <b>Google Chrome</b> or <b>Microsoft Edge</b> (v89+), opened via <b>https://</b> or <b>localhost</b>. If the API is missing, enable <i>Experimental Web Platform features</i> at <b>chrome://flags/</b>. The interface below still renders, but connecting is disabled.</span>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15l3-3-3-3"/><path d="M12 15h5"/></svg>Keyboard</h3>
+      Press <b>Ctrl+A</b> then <b>C</b> to copy and <b>Ctrl+A</b> then <b>V</b> to paste inside the terminal.
+    </div>
+    <div class="card">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>OpenSource Hardware</h3>
+      <a href="https://oshwhub.com/openiic" target="_blank" rel="noopener">https://oshwhub.com/openiic</a>
+    </div>
+    <div class="card">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>Source code</h3>
+      <a href="https://github.com/rafaelaroca/web-serial-terminal" target="_blank" rel="noopener">rafaelaroca/web-serial-terminal</a><br>
+      <a href="https://github.com/pythoniot/WebSerial" target="_blank" rel="noopener">pythoniot/WebSerial</a>
+    </div>
+    <div class="card">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 0 0 4 14.9"/><path d="M12 12v9"/><path d="m8 17 4 4 4-4"/></svg>Offline usage</h3>
+      This page works offline: download the <a href="https://github.com/rafaelaroca/web-serial-terminal/archive/refs/heads/master.zip" target="_blank" rel="noopener">ZIP file</a>, unzip and open <b>index.html</b> (Chrome / Edge; Firefox not supported).
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Web Serial Terminal &middot; term.js (MIT, &copy; 2012-2013 Christopher Jeffrey) &middot; OpenSource Hardware at <b>oshwhub.com/openiic</b>
+</footer>
+
+<script src="term.js"></script>
 <script>
-
 
 var term;
 
-function calculate_size(win) {
-    var cols = Math.max(80, Math.min(120, (win.innerWidth - 200) / 8)) | 0;
-    var rows = Math.max(24, Math.min(60, (win.innerHeight - 200) / 16)) | 0;
-    return [cols, rows];
+/* ---------- 终端尺寸：按容器真实可用宽高 + 实测字符尺寸计算行列 ----------
+   原实现用 (innerWidth-100)/8 估算列数，16px 等宽字实际约 9.6px/字符，
+   122 列需要 ~1170px，远超容器宽度，导致终端整体溢出到卡片外。 */
+function measureCell() {
+    var probe = document.createElement('span');
+    probe.className = 'terminal';           // 复用 .terminal 的字体与行高
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;top:-9999px;left:-9999px;border:0;padding:0;';
+    probe.textContent = new Array(101).join('M');
+    document.body.appendChild(probe);
+    var rect = probe.getBoundingClientRect();
+    document.body.removeChild(probe);
+    return { w: rect.width / 100 || 8, h: rect.height || 17 };
+}
+
+function fitTerminal() {
+    if (!term || !term.element) return;
+    var wrap = document.querySelector('.term-wrap');
+    if (!wrap) return;
+    var availW = wrap.clientWidth - 20;     // 左右各 10px 内边距
+    var availH = wrap.clientHeight - 20;    // 上下各 10px 内边距
+    if (availW <= 0 || availH <= 0) return;
+    var cell = measureCell();
+    var cols = Math.max(40, Math.floor(availW / cell.w));
+    var rows = Math.max(10, Math.floor(availH / cell.h));
+    if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
+}
+
+function setStatus(connected) {
+    var pill = document.getElementById('StatusPill');
+    var text = document.getElementById('StatusText');
+    if (connected) {
+        pill.classList.add('on');
+        text.textContent = 'Connected';
+    } else {
+        pill.classList.remove('on');
+        text.textContent = 'Disconnected';
+    }
 }
 
 (function() {
     window.onload = function() {
-    
-      var size = calculate_size(self);
+
       term = new Terminal({
-        cols: size[0],
-        rows: size[1],
+        cols: 80,
+        rows: 24,
         useStyle: true,
         screenKeys: true,
-        cursorBlink: false
+        cursorBlink: true
       });
       term.open(document.getElementById("term"));
+      fitTerminal();
+      /* 小屏首屏：term.js 会 focus 隐藏 textarea，浏览器会自动把终端滚进视野，
+         把页头标题顶出屏幕。这里在首屏 600ms 内把轻微的自动滚动拉回顶部。 */
+      var ta = document.querySelector('#term textarea');
+      if (ta && ta.blur) ta.blur();
+      var guard = true;
+      var pinTop = function () {
+        if (guard && window.scrollY > 0 && window.scrollY < 240) window.scrollTo(0, 0);
+      };
+      window.addEventListener('scroll', pinTop, { passive: true });
+      setTimeout(function () {
+        guard = false;
+        window.removeEventListener('scroll', pinTop);
+        pinTop();
+      }, 600);
     };
+
+    var resizeTimer = null;
     window.addEventListener('resize', function() {
-        var size = calculate_size(self);
-        term.resize(size[0], size[1]);
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(fitTerminal, 120);
     });
 }).call(this);
 
@@ -86,8 +528,13 @@ function calculate_size(win) {
  *
  */
 
-const connectButton = document.getElementById ('SerialConnectButton');
+const connectButton = document.getElementById('SerialConnectButton');
+const clearButton = document.getElementById('ClearButton');
 let port;
+
+clearButton.addEventListener('click', function () {
+    if (term) term.reset();
+});
 
 if ('serial' in navigator) {
   connectButton.addEventListener('click', function () {
@@ -95,13 +542,16 @@ if ('serial' in navigator) {
       term.write('\x1b[31mDisconnected from Serial Port\x1b[m\r\n');
       port.close();
       port = undefined;
-      connectButton.innerText = 'Connect';
+      connectButton.classList.remove('connected');
+      connectButton.querySelector('span').innerText = 'Connect';
 
       document.getElementById('SerialSpeed').disabled = false;
+      setStatus(false);
 
     }
     else {
-      connectButton.innerText = 'Disconnect';
+      connectButton.classList.add('connected');
+      connectButton.querySelector('span').innerText = 'Disconnect';
       getReader();
     }
   });
@@ -109,9 +559,7 @@ if ('serial' in navigator) {
   connectButton.disabled = false;
 }
 else {
-  const error = document.createElement('p');
-  error.innerHTML = '<p>Support for Serial Web API not enabled. Please enable it using chrome://flags/ and enable Experimental Web Platform fetures</p>';
-
+  document.getElementById('NoSerialBanner').style.display = 'flex';
 }
 
 
@@ -135,12 +583,12 @@ async function getReader() {
 	var strSpd = e.options[e.selectedIndex].value;
 
 	var speed = parseInt(strSpd);
-	await port.open({ baudRate: [speed] });
+	await port.open({ baudRate: speed });
 
 	document.getElementById('SerialSpeed').disabled = true;
 
-        connectButton.innerText = 'Disconnect';
-        term.write('\x1b[31mConnected using Web Serial API !\x1b[m\r\n');
+        setStatus(true);
+        term.write('\x1b[32mConnected using Web Serial API (' + speed + ' baud)\x1b[m\r\n');
 
         const appendStream = new WritableStream({
           write(chunk) {
@@ -150,7 +598,10 @@ async function getReader() {
 
         port.readable
           .pipeThrough(new TextDecoderStream())
-          .pipeTo(appendStream);
+          .pipeTo(appendStream)
+          .catch(function () {
+            /* stream ended (device unplugged) */
+          });
 
 
 	term.on('data', function(data) {
@@ -160,5 +611,5 @@ async function getReader() {
       }
 </script>
 
+</body>
 </html>
-
