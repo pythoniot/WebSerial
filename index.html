@@ -164,6 +164,8 @@
     border-left: 1px solid rgba(34, 211, 238, 0.22);
   }
   .chip.dual a:hover { color: #ecfeff; background: rgba(14, 116, 144, 0.6); }
+  /* 名称本身作为通用控制台链接时，不显示左分隔线，保持 chip 首段视觉连续 */
+  .chip.dual a.name { border-left: 0; }
 
   /* 宽度不足时退回上下堆叠（芯片行左对齐），避免右侧矩阵被挤到下一行后悬空 */
   @media (max-width: 1160px) {
@@ -350,19 +352,17 @@
 
       <div class="chip-row">
         <span class="row-tag live">Gen-2</span>
-        <a class="chip link" href="./uk550.html" target="_blank" rel="noopener" title="打开 UK550-WST2MOD 控制台">UK550-WST2MOD</a>
-        <a class="chip link" href="./uk551.html" target="_blank" rel="noopener" title="打开 UK551-WST21WR 控制台">UK551-WST21WR</a>
+        <a class="chip link" href="./uk550.html" target="_blank" rel="noopener" title="打开 UK550-MOD 控制台">UK550-MOD</a>
+        <a class="chip link" href="./uk551.html" target="_blank" rel="noopener" title="打开 UK551-1WR 控制台">UK551-1WR</a>
 
-        <span class="chip dual" title="UK554-WST2SPI · Flash 烧录器 / 通用 SPI">
-          <span class="name">UK554-WST2SPI</span>
+        <span class="chip dual" title="UK554-SPI · Flash 烧录器 / 通用 SPI">
+          <a class="name" href="./uk554.html" target="_blank" rel="noopener" title="打开 UK554-SPI 通用控制台">UK554-SPI</a>
           <a href="./uk554-flash.html" target="_blank" rel="noopener">Flash</a>
-          <a href="./uk554-gen.html" target="_blank" rel="noopener">Gen</a>
         </span>
 
-        <span class="chip dual" title="UK557-WST2I2C · EEPROM 烧写 / 通用 I2C">
-          <span class="name">UK557-WST2I2C</span>
+        <span class="chip dual" title="UK557-I2C · EEPROM 烧写 / 通用 I2C">
+          <a class="name" href="./uk557.html" target="_blank" rel="noopener" title="打开 UK557-I2C 通用控制台">UK557-I2C</a>
           <a href="./uk557-eeprom.html" target="_blank" rel="noopener">EEPROM</a>
-          <a href="./uk557-gen.html" target="_blank" rel="noopener">Gen</a>
         </span>
       </div>
     </nav>
